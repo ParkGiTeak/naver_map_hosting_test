@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <script id="naverMapScript" type="text/javascript"></script>
 
     <style>
         html, body {
@@ -12,194 +13,245 @@
             height: 100%;
             overflow: hidden;
         }
-        #map {
-            width: 100vw;
-            height: 100vh;
-        }
     </style>
 </head>
 <body>
-    <button onclick="getCenterBtnClick()">클릭하세요</button>
-    <div id="map"></div>
+<div id="map" style="width: 100%; height: 100%;"></div>
 
-    <script type="text/javascript">
+<script id="naverMapFunctions" type="text/javascript">
+    let map;
+    let markers = new Map();
+    let markerEventListeners = new Map();
+    let mapEventListeners = new Map();
 
-        let map;
+    function initMap(mapOptions = null) {
+        console.log("Naver Map Init Call", mapOptions);
 
-        function getNaverPosition(positionValue) {
-            if (positionValue === null || positionValue === undefined) return undefined;
-            const positionMap = {
-                0: naver.maps.Position.CENTER,
-                1: naver.maps.Position.TOP_LEFT,
-                2: naver.maps.Position.TOP_CENTER,
-                3: naver.maps.Position.TOP_RIGHT,
-                4: naver.maps.Position.LEFT_CENTER,
-                5: naver.maps.Position.LEFT_TOP,
-                6: naver.maps.Position.LEFT_BOTTOM,
-                7: naver.maps.Position.RIGHT_TOP,
-                8: naver.maps.Position.RIGHT_CENTER,
-                9: naver.maps.Position.RIGHT_BOTTOM,
-                10: naver.maps.Position.BOTTOM_LEFT,
-                11: naver.maps.Position.BOTTOM_CENTER,
-                12: naver.maps.Position.BOTTOM_RIGHT
-            };
-            return positionMap[positionValue];
+        window.navermap_authFailure = function () {
+            window.FlutterMethodChannel.postMessage(JSON.stringify({type: 'mapLoadFail'}));
+            console.log("Naver Map Init ERROR!");
         }
 
-        function getNaverMapTypeId(mapTypeId) {
-            if (mapTypeId === null || mapTypeId === undefined) return undefined;
-            const mapTypeIdMap = {
-                'NORMAL': naver.maps.MapTypeId.NORMAL,
-                'TERRAIN': naver.maps.MapTypeId.TERRAIN,
-                'SATELLITE': naver.maps.MapTypeId.SATELLITE,
-                'HYBRID': naver.maps.MapTypeId.HYBRID
-            };
-            return mapTypeIdMap[mapTypeId];
+        map = new naver.maps.Map('map', mapOptions);
+
+        if (window.FlutterMethodChannel) {
+            window.FlutterMethodChannel.postMessage(JSON.stringify({type: 'mapLoaded'}));
         }
+    }
 
-        function initMap(mapOptions = null) {
-            console.log("Naver Map Init Call", mapOptions);
-
-            window.navermap_authFailure = function () {
-                window.FlutterMethodChannel.postMessage(JSON.stringify({type: 'mapLoadFail'}));
-                console.log("Naver Map Init ERROR!");
+    function addMarker(markerId, markerOptions) {
+        if (map) {
+            if (markers.has(markerId) && markers.get(markerId).getMap()) {
+                return;
             }
+            const initMarkerOptions = {
+                map: map,
+                ...markerOptions
+            };
+            let marker = new naver.maps.Marker(initMarkerOptions);
+            markers.set(markerId, marker);
+        }
+    }
 
-            const initMapOptions = {};
+    function updateMarker(markerId, markerOptions) {
+        if (markers.has(markerId)) {
+            const initMarkerOptions = {
+                map: map,
+                ...markerOptions
+            };
+            markers.get(markerId).setOptions(initMarkerOptions);
+        }
+    }
 
-            if (mapOptions !== null) {
-                for (const key in mapOptions) {
-                    if (mapOptions.hasOwnProperty(key) && mapOptions[key] !== null) {
-                        switch (key) {
-                            case 'center':
-                                if (mapOptions.center.lat !== undefined && mapOptions.center.lng !== undefined) {
-                                    initMapOptions.center = new naver.maps.LatLng(mapOptions.center.lat, mapOptions.center.lng);
-                                } else if (mapOptions.center.x !== undefined && mapOptions.center.y !== undefined) {
-                                    initMapOptions.center = new naver.maps.Point(mapOptions.center.x, mapOptions.center.y);
-                                }
-                                break;
-                            case 'bounds':
-                                if (mapOptions.bounds.southWest && mapOptions.bounds.northEast) {
-                                    initMapOptions.bounds = new naver.maps.LatLngBounds(
-                                        new naver.maps.LatLng(mapOptions.bounds.southWest.lat, mapOptions.bounds.southWest.lng),
-                                        new naver.maps.LatLng(mapOptions.bounds.northEast.lat, mapOptions.bounds.northEast.lng)
-                                    );
-                                } else if (mapOptions.bounds.min && mapOptions.bounds.max) {
-                                    initMapOptions.bounds = new naver.maps.PointBounds(
-                                        new naver.maps.Point(mapOptions.bounds.min.x, mapOptions.bounds.min.y),
-                                        new naver.maps.Point(mapOptions.bounds.max.x, mapOptions.bounds.max.y)
-                                    );
-                                }
-                                break;
-                            case 'maxBounds':
-                                if (mapOptions.maxBounds.southWest && mapOptions.maxBounds.northEast) {
-                                    initMapOptions.maxBounds = new naver.maps.LatLngBounds(
-                                        new naver.maps.LatLng(mapOptions.maxBounds.southWest.lat, mapOptions.maxBounds.southWest.lng),
-                                        new naver.maps.LatLng(mapOptions.maxBounds.northEast.lat, mapOptions.maxBounds.northEast.lng)
-                                    );
-                                } else if (mapOptions.maxBounds.min && mapOptions.maxBounds.max) {
-                                    initMapOptions.maxBounds = new naver.maps.PointBounds(
-                                        new naver.maps.Point(mapOptions.maxBounds.min.x, mapOptions.maxBounds.min.y),
-                                        new naver.maps.Point(mapOptions.maxBounds.max.x, mapOptions.maxBounds.max.y)
-                                    );
-                                }
-                                break;
-                            case 'padding':
-                                initMapOptions.padding = {
-                                    top: mapOptions.padding.top,
-                                    right: mapOptions.padding.right,
-                                    bottom: mapOptions.padding.bottom,
-                                    left: mapOptions.padding.left
-                                };
-                                break;
-                            case 'size':
-                                initMapOptions.size = new naver.maps.Size(mapOptions.size.width, mapOptions.size.height);
-                                break;
-                            case 'zoomOrigin':
-                                 if (mapOptions.zoomOrigin) {
-                                    if (mapOptions.zoomOrigin.lat !== undefined && mapOptions.zoomOrigin.lng !== undefined) {
-                                        initMapOptions.zoomOrigin = new naver.maps.LatLng(mapOptions.zoomOrigin.lat, mapOptions.zoomOrigin.lng);
-                                    } else if (mapOptions.zoomOrigin.x !== undefined && mapOptions.zoomOrigin.y !== undefined) {
-                                        initMapOptions.zoomOrigin = new naver.maps.Point(mapOptions.zoomOrigin.x, mapOptions.zoomOrigin.y);
-                                    }
-                                 }
-                                break;
-                            case 'resizeOrigin':
-                                initMapOptions.resizeOrigin = getNaverPosition(mapOptions.resizeOrigin);
-                                break;
-                            case 'zoomControlOptions':
-                                initMapOptions.zoomControlOptions = {
-                                    ...mapOptions.zoomControlOptions,
-                                    position: getNaverPosition(mapOptions.zoomControlOptions.position),
-                                    style: mapOptions.zoomControlOptions.style === 'LARGE' ? naver.maps.ZoomControlStyle.LARGE : naver.maps.ZoomControlStyle.SMALL
-                                };
-                                break;
-                            case 'mapTypeControlOptions':
-                                {
-                                    const opts = mapOptions.mapTypeControlOptions;
-                                    const newOpts = {};
-                                    if (opts.position) newOpts.position = getNaverPosition(opts.position);
-                                    if (opts.style) newOpts.style = opts.style === 'DROPDOWN' ? naver.maps.MapTypeControlStyle.DROPDOWN : naver.maps.MapTypeControlStyle.BUTTONS;
-                                    if (opts.mapTypeIds) {
-                                        newOpts.mapTypeIds = opts.mapTypeIds
-                                            .map(idStr => getNaverMapTypeId(idStr))
-                                            .filter(Boolean);
-                                    }
-                                    initMapOptions.mapTypeControlOptions = newOpts;
-                                }
-                                break;
-                            case 'mapTypeId':
-                                initMapOptions.mapTypeId = getNaverMapTypeId(mapOptions.mapTypeId);
-                                break;
-                            case 'mapDataControlOptions':
-                            case 'logoControlOptions':
-                            case 'scaleControlOptions':
-                                initMapOptions[key] = {
-                                    ...mapOptions[key],
-                                    position: getNaverPosition(mapOptions[key].position)
-                                };
-                                break;
-                            default:
-                                initMapOptions[key] = mapOptions[key];
-                                break;
-                        }
-                    }
-                }
+    function removeMarker(markerId) {
+        if (markers.has(markerId)) {
+            markers.get(markerId).setMap(null);
+            markers.delete(markerId);
+        }
+    }
+
+    function removeMarkerAll() {
+        markers.forEach((marker) => marker.setMap(null));
+        markers.clear();
+    }
+
+    function getMarkerIds() {
+        return Array.from(markers.keys());
+    }
+
+    function addMarkerClickEvent(markerId) {
+        if (markers.has(markerId)) {
+            if (markerEventListeners.has(markerId)) {
+                return;
             }
-
-            map = new naver.maps.Map('map', initMapOptions);
-
-            if (window.FlutterMethodChannel) {
-                window.FlutterMethodChannel.postMessage(JSON.stringify({type: 'mapLoaded'}));
-                console.log("MapLoaded Send Flutter");
-            }
-
-            naver.maps.Event.addListener(map, 'click', function(e) {
-                console.log("pos::", e);
+            const listener = naver.maps.Event.addListener(markers.get(markerId), 'click', function() {
+                window.MarkerEvent.postMessage(JSON.stringify({type: 'markerClick', markerId: markerId}));
             });
+            markerEventListeners.set(markerId, listener);
         }
+    }
 
-        window.setZoom = function(zoomLevel) {
-            if (map) {
-                map.setZoom(zoomLevel);
-                console.log(`setZoom Call zoomLevel: ${zoomLevel}`);
+    function removeMarkerClickEvent(markerId) {
+        if (markers.has(markerId)) {
+            if (markerEventListeners.has(markerId)) {
+                naver.maps.Event.removeListener(markerEventListeners.get(markerId));
+                markerEventListeners.delete(markerId);
             }
         }
-        function getCenterBtnClick() {
-            console.log("zoomType::", naver.maps.ZoomControlStyle.SMALL);
-            console.log("MapTypeControlStyle::", naver.maps.MapTypeControlStyle.BUTTON);
-            console.log("getCenter::", map.getCenter());
-            const bounds = map.getBounds();
-            console.log("getBounds::", bounds);
-            console.log("hasBounds::", {ne: {lat: 37.3758566, lng: 127.1440228}, sw: {lat: 37.3432806, lng: 127.0667752}}.hasLatLng({lat: 37.3595704, lng: 127.105399}));
+    }
+
+    function hasLatLng(latLngBounds, latLng) {
+        const bounds = new naver.maps.LatLngBounds(
+            new naver.maps.LatLng(latLngBounds.southWest.lat, latLngBounds.southWest.lng),
+            new naver.maps.LatLng(latLngBounds.northEast.lat, latLngBounds.northEast.lng)
+        );
+        return bounds.hasLatLng(latLng);
+    }
+
+    function hasPoint(pointBounds, point) {
+        const bounds = new naver.maps.PointBounds(
+            new naver.maps.Point(pointBounds.min.x, pointBounds.min.y),
+            new naver.maps.Point(pointBounds.max.x, pointBounds.max.y)
+        );
+        return bounds.hasPoint(point);
+    }
+
+    function addMapClickEventListener() {
+        if (mapEventListeners.has('click')) {
+            return;
         }
-
-        new naver.maps.Marker({
-            icon: {path: 1},
-            position: {lat: 37.3595704, lng: 127.105399},
-            map: map
+        const listener = naver.maps.Event.addListener(map, 'click', function(pointerEvent) {
+            window.MapEvent.postMessage(JSON.stringify({type: 'click', coord: pointerEvent.coord}));
         });
+        mapEventListeners.set('click', listener);
+    }
 
-    </script>
+    function removeMapClickEventListener() {
+        if (mapEventListeners.has('click')) {
+            const listener = mapEventListeners.get('click');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('click');
+        }
+    }
+
+    function addMapLongTapEventListener() {
+        if (mapEventListeners.has('longtap')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'longtap', function(pointerEvent) {
+            window.MapEvent.postMessage(JSON.stringify({type: 'longtap', coord: pointerEvent.coord}));
+        });
+        mapEventListeners.set('longtap', listener);
+    }
+
+    function removeMapLongTapEventListener() {
+        if (mapEventListeners.has('longtap')) {
+            const listener = mapEventListeners.get('longtap');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('longtap');
+        }
+    }
+
+    function addMapIdleEventListener() {
+        if (mapEventListeners.has('idle')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'idle', function() {
+            window.MapEvent.postMessage(JSON.stringify({type: 'idle'}));
+        });
+        mapEventListeners.set('idle', listener);
+    }
+
+    function removeMapIdleEventListener() {
+        if (mapEventListeners.has('idle')) {
+            const listener = mapEventListeners.get('idle');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('idle');
+        }
+    }
+
+    function addMapZoomChangedEventListener() {
+        if (mapEventListeners.has('zoom_changed')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'zoom_changed', function(zoom) {
+            window.MapEvent.postMessage(JSON.stringify({type: 'zoom_changed', zoom: zoom}));
+        });
+        mapEventListeners.set('zoom_changed', listener);
+    }
+
+    function removeMapZoomChangedEventListener() {
+        if (mapEventListeners.has('zoom_changed')) {
+            const listener = mapEventListeners.get('zoom_changed');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('zoom_changed');
+        }
+    }
+
+    function addMapZoomEndEventListener() {
+        if (mapEventListeners.has('zoomend')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'zoomend', function() {
+            window.MapEvent.postMessage(JSON.stringify({type: 'zoomend'}));
+        });
+        mapEventListeners.set('zoomend', listener);
+    }
+
+    function removeMapZoomEndEventListener() {
+        if (mapEventListeners.has('zoomend')) {
+            const listener = mapEventListeners.get('zoomend');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('zoomend');
+        }
+    }
+
+    function addMapZoomStartEventListener() {
+        if (mapEventListeners.has('zoomstart')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'zoomstart', function() {
+            window.MapEvent.postMessage(JSON.stringify({type: 'zoomstart'}));
+        });
+        mapEventListeners.set('zoomstart', listener);
+    }
+
+    function removeMapZoomStartEventListener() {
+        if (mapEventListeners.has('zoomstart')) {
+            const listener = mapEventListeners.get('zoomstart');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('zoomstart');
+        }
+    }
+
+    function addMapCenterChangedEventListener() {
+        if (mapEventListeners.has('center_changed')) {
+            return;
+        }
+        const listener = naver.maps.Event.addListener(map, 'center_changed', function(center) {
+            window.MapEvent.postMessage(JSON.stringify({type: 'center_changed', center: center}));
+        });
+        mapEventListeners.set('center_changed', listener);
+    }
+
+    function removeMapCenterChangedEventListener() {
+        if (mapEventListeners.has('center_changed')) {
+            const listener = mapEventListeners.get('center_changed');
+            naver.maps.Event.removeListener(listener);
+            mapEventListeners.delete('center_changed');
+        }
+    }
+
+    function disposeMap() {
+        mapEventListeners.forEach((listener) => naver.maps.Event.removeListener(listener));
+        mapEventListeners.clear();
+        markerEventListeners.forEach((listener) => naver.maps.Event.removeListener(listener));
+        markerEventListeners.clear();
+        markers.forEach((marker) => marker.setMap(null));
+        markers.clear();
+    }
+
+    document.dispatchEvent(new CustomEvent('naverMapFunctionsReady'));
+</script>
 </body>
 </html>
