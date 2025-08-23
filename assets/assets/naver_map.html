@@ -24,7 +24,7 @@
     let markerEventListeners = new Map();
     let mapEventListeners = new Map();
 
-    function initMap(mapOptions = null) {
+    function initMap(mapOptions = {}) {
         console.log("Naver Map Init Call", mapOptions);
 
         window.navermap_authFailure = function () {
