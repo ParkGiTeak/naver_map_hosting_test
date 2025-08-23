@@ -24,7 +24,7 @@
     let markerEventListeners = new Map();
     let mapEventListeners = new Map();
 
-    function initMap(mapOptions = {}) {
+    function initMap(mapOptions) {
         console.log("Naver Map Init Call", mapOptions);
 
         window.navermap_authFailure = function () {
@@ -32,7 +32,7 @@
             console.log("Naver Map Init ERROR!");
         }
 
-        map = new naver.maps.Map('map', mapOptions);
+        map = new naver.maps.Map('map', mapOptions || {});
 
         if (window.FlutterMethodChannel) {
             window.FlutterMethodChannel.postMessage(JSON.stringify({type: 'mapLoaded'}));
